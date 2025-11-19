@@ -68,14 +68,7 @@ const Index = () => {
             >
               立即捐助
             </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              className="border-white text-white hover:bg-white/10"
-              onClick={() => window.open('https://github.com/yourusername/charity-platform', '_blank')}
-            >
-              查看合约
-            </Button>
+  
           </div>
         </div>
       </div>
