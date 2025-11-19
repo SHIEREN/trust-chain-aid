@@ -2,7 +2,7 @@
 
 ## Project info
 
-
+https://sheaide.lovable.app
 
 ## How can I edit this code?
 
