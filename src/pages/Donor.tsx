@@ -7,15 +7,33 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Heart, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { ConnectWallet } from "@/components/ConnectWallet";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther, keccak256, toBytes } from 'viem';
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/config/contracts';
 
 const Donor = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const { address, isConnected } = useAccount();
+  const { data: hash, writeContract, isPending } = useWriteContract();
+  
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+  });
 
   const handleDonate = async () => {
+    if (!isConnected) {
+      toast({
+        title: "钱包未连接",
+        description: "请先连接你的钱包",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!amount || parseFloat(amount) <= 0) {
       toast({
         title: "请输入有效金额",
@@ -25,31 +43,57 @@ const Donor = () => {
       return;
     }
 
-    setIsLoading(true);
-    
-    // 模拟区块链交易
-    setTimeout(() => {
-      toast({
-        title: "捐助成功！",
-        description: `感谢您捐助 ${amount} ETH，您的爱心将帮助需要帮助的女性。`,
+    try {
+      // 加密消息（使用 keccak256 哈希）
+      const encryptedData = message 
+        ? keccak256(toBytes(message))
+        : keccak256(toBytes("Anonymous donation"));
+
+      // 调用智能合约
+      writeContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'donate',
+        args: [encryptedData],
+        value: parseEther(amount),
       });
-      setAmount("");
-      setMessage("");
-      setIsLoading(false);
-    }, 2000);
+
+      toast({
+        title: "交易已提交",
+        description: "请在钱包中确认交易...",
+      });
+    } catch (error: any) {
+      toast({
+        title: "捐赠失败",
+        description: error.message || "交易失败，请重试",
+        variant: "destructive",
+      });
+    }
   };
+
+  // 监听交易成功
+  if (isSuccess) {
+    toast({
+      title: "捐助成功！",
+      description: `感谢您捐助 ${amount} ETH，您的爱心将帮助需要帮助的女性。`,
+    });
+    setAmount("");
+    setMessage("");
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate('/')}
-          className="mb-6"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          返回首页
-        </Button>
+        <div className="flex justify-between items-center mb-6">
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate('/')}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            返回首页
+          </Button>
+          <ConnectWallet />
+        </div>
 
         <div className="bg-gradient-warm rounded-2xl p-8 mb-8 shadow-soft">
           <div className="flex items-center gap-4 mb-4">
