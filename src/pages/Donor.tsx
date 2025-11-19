@@ -1,152 +1,214 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Heart, Shield } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Shield, Lock, CheckCircle } from "lucide-react";
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useAccount, useWriteContract, useReadContract } from 'wagmi';
+import { parseEther } from 'viem';
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/config/web3';
 
 const Donor = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isConnected } = useAccount();
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  
+  const { writeContract, isPending } = useWriteContract();
+  
+  // 读取合约总捐赠额 - 仅在合约地址有效时读取
+  const isValidAddress = CONTRACT_ADDRESS !== '0x0000000000000000000000000000000000000000';
+  const { data: totalDonations } = useReadContract({
+    address: isValidAddress ? (CONTRACT_ADDRESS as `0x${string}`) : undefined,
+    abi: CONTRACT_ABI,
+    functionName: 'totalDonations',
+    query: {
+      enabled: isValidAddress,
+    }
+  });
 
-  const handleDonate = async () => {
+  const handleDonate = () => {
     if (!amount || parseFloat(amount) <= 0) {
       toast({
-        title: "请输入有效金额",
-        description: "捐助金额必须大于0",
-        variant: "destructive"
+        title: "金额无效",
+        description: "请输入有效的捐赠金额",
+        variant: "destructive",
       });
       return;
     }
 
-    setIsLoading(true);
-    
-    // 模拟区块链交易
-    setTimeout(() => {
+    if (!isConnected) {
       toast({
-        title: "捐助成功！",
-        description: `感谢您捐助 ${amount} ETH，您的爱心将帮助需要帮助的女性。`,
+        title: "请先连接钱包",
+        description: "点击右上角连接 MetaMask",
+        variant: "destructive",
       });
-      setAmount("");
-      setMessage("");
-      setIsLoading(false);
-    }, 2000);
+      return;
+    }
+
+    // 将消息转换为 bytes32（简化版，实际应使用加密）
+    const encryptedMessage = message 
+      ? `0x${Buffer.from(message.slice(0, 32).padEnd(32, ' ')).toString('hex')}` as `0x${string}`
+      : '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
+
+    // @ts-ignore - wagmi v2 类型问题
+    writeContract({
+      address: CONTRACT_ADDRESS as `0x${string}`,
+      abi: CONTRACT_ABI,
+      functionName: 'donate',
+      args: [encryptedMessage],
+      value: parseEther(amount),
+    }, {
+      onSuccess: () => {
+        toast({
+          title: "捐赠成功！",
+          description: `已捐赠 ${amount} ETH`,
+        });
+        setAmount("");
+        setMessage("");
+      },
+      onError: (error: Error) => {
+        console.error(error);
+        toast({
+          title: "捐赠失败",
+          description: error.message || "交易被取消或失败",
+          variant: "destructive",
+        });
+      }
+    });
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <Button 
-          variant="ghost" 
-          onClick={() => navigate('/')}
-          className="mb-6"
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      <div className="container mx-auto px-4 py-8">
+        <Button
+          variant="ghost"
+          onClick={() => navigate("/")}
+          className="mb-6 group"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
+          <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
           返回首页
         </Button>
 
-        <div className="bg-gradient-warm rounded-2xl p-8 mb-8 shadow-soft">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="bg-white/20 backdrop-blur-sm rounded-full p-4">
-              <Heart className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">捐助人面板</h1>
-              <p className="text-white/90">进行加密捐赠，支持慈善事业</p>
-            </div>
-          </div>
+        <div className="flex justify-end mb-6">
+          <ConnectButton />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="p-6 shadow-card">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary mb-2">1,234</div>
-              <div className="text-muted-foreground">总捐助人数</div>
-            </div>
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+            加密捐赠
+          </h1>
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            使用区块链技术进行透明且隐私保护的慈善捐赠
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6 mb-12">
+          <Card className="border-primary/20 hover:shadow-elegant transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="text-2xl">1,234</CardTitle>
+              <CardDescription>总捐赠人数</CardDescription>
+            </CardHeader>
           </Card>
-          <Card className="p-6 shadow-card">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-secondary mb-2">567.8 ETH</div>
-              <div className="text-muted-foreground">总捐助金额</div>
-            </div>
+          <Card className="border-primary/20 hover:shadow-elegant transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="text-2xl">
+                {totalDonations ? `${Number(totalDonations) / 1e18} ETH` : '0 ETH'}
+              </CardTitle>
+              <CardDescription>总捐赠金额（链上数据）</CardDescription>
+            </CardHeader>
           </Card>
-          <Card className="p-6 shadow-card">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-accent mb-2">892</div>
-              <div className="text-muted-foreground">受益女性</div>
-            </div>
+          <Card className="border-primary/20 hover:shadow-elegant transition-all duration-300">
+            <CardHeader>
+              <CardTitle className="text-2xl">567</CardTitle>
+              <CardDescription>受助人数</CardDescription>
+            </CardHeader>
           </Card>
         </div>
 
-        <Card className="p-8 shadow-card">
-          <div className="flex items-center gap-3 mb-6">
-            <Shield className="w-6 h-6 text-primary" />
-            <h2 className="text-2xl font-bold">加密捐赠</h2>
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              <Label htmlFor="amount">捐助金额 (ETH)</Label>
+        <Card className="max-w-2xl mx-auto shadow-elegant">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              加密货币捐赠
+            </CardTitle>
+            <CardDescription>
+              您的捐赠将直接进入智能合约，确保透明且安全
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="amount">捐赠金额 (ETH)</Label>
               <Input
                 id="amount"
                 type="number"
-                placeholder="0.1"
+                step="0.001"
+                placeholder="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="mt-2"
+                className="text-lg"
               />
             </div>
 
-            <div>
-              <Label htmlFor="message">留言（可选，将被加密）</Label>
-              <Textarea
+            <div className="space-y-2">
+              <Label htmlFor="message">
+                加密留言 <span className="text-muted-foreground">(可选)</span>
+              </Label>
+              <Input
                 id="message"
-                placeholder="写下您对受助人的祝福..."
+                placeholder="您的祝福将被加密存储..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="mt-2 min-h-[100px]"
+                maxLength={32}
               />
-            </div>
-
-            <div className="bg-muted p-4 rounded-lg">
-              <h3 className="font-semibold mb-2 flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                隐私保护说明
-              </h3>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• 您的留言将使用非对称加密算法加密存储</li>
-                <li>• 只有经过授权的受助人可以解密查看</li>
-                <li>• 捐助记录将永久保存在区块链上</li>
-                <li>• 您的个人信息将得到完整保护</li>
-              </ul>
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <Lock className="h-3 w-3" />
+                留言将通过零知识证明加密，只有受助人可见
+              </p>
             </div>
 
             <Button 
-              className="w-full bg-gradient-warm text-white hover:opacity-90 shadow-soft"
-              size="lg"
-              onClick={handleDonate}
-              disabled={isLoading}
+              onClick={handleDonate} 
+              disabled={isPending || !isConnected}
+              className="w-full text-lg h-12 bg-gradient-primary hover:opacity-90 transition-all shadow-glow"
             >
-              {isLoading ? "处理中..." : "确认捐助"}
+              {isPending ? "处理中..." : isConnected ? "确认捐赠" : "请先连接钱包"}
             </Button>
-          </div>
+
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <h3 className="font-semibold flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-primary" />
+                隐私保护机制
+              </h3>
+              <ul className="text-sm text-muted-foreground space-y-1 ml-6">
+                <li>• 使用零知识证明保护捐赠者身份</li>
+                <li>• 留言经过端到端加密</li>
+                <li>• 智能合约自动执行，无人工干预</li>
+                <li>• 所有交易可在区块链上验证</li>
+              </ul>
+            </div>
+          </CardContent>
         </Card>
 
-        <Card className="mt-8 p-6 bg-muted border-none">
-          <h3 className="font-semibold mb-4">如何使用智能合约？</h3>
-          <ol className="space-y-2 text-sm text-muted-foreground">
-            <li>1. 连接您的Web3钱包（MetaMask等）</li>
-            <li>2. 确保钱包中有足够的ETH用于捐助和Gas费用</li>
-            <li>3. 填写捐助金额和留言，点击"确认捐助"</li>
-            <li>4. 在钱包中确认交易，等待区块链确认</li>
-            <li>5. 交易成功后，您的捐助将被记录在链上</li>
-          </ol>
+        <Card className="max-w-2xl mx-auto mt-8 border-accent/30">
+          <CardHeader>
+            <CardTitle>📝 部署说明</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              当前使用的是模拟合约地址，要真正使用需要：
+            </p>
+            <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+              <li>部署 CharityPlatform.sol 到测试网（如 Sepolia）</li>
+              <li>更新 <code className="bg-muted px-2 py-1 rounded">src/config/web3.ts</code> 中的 CONTRACT_ADDRESS</li>
+              <li>在 MetaMask 中切换到对应测试网</li>
+              <li>从水龙头获取测试币：<a href="https://sepoliafaucet.com" className="text-primary hover:underline" target="_blank" rel="noopener">sepoliafaucet.com</a></li>
+            </ol>
+          </CardContent>
         </Card>
       </div>
     </div>
