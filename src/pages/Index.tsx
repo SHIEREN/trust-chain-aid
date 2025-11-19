@@ -72,7 +72,7 @@ const Index = () => {
               size="lg" 
               variant="outline" 
               className="border-white text-white hover:bg-white/10"
-              onClick={() => window.open('https://github.com/yourusername/charity-platform', '_blank')}
+              onClick={() => window.open('https://github.com/SHIEREN/trust-chain-aid/blob/main/contracts/CharityPlatform.sol', '_blank')}
             >
               查看合约
             </Button>
