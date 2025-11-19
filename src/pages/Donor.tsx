@@ -50,9 +50,9 @@ const Donor = () => {
         : keccak256(toBytes("Anonymous donation"));
 
       // 调用智能合约
-      writeContract({
+      (writeContract as any)({
         address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI as any,
+        abi: CONTRACT_ABI,
         functionName: 'donate',
         args: [encryptedData],
         value: parseEther(amount),
